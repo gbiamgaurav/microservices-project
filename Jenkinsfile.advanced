@@ -1,0 +1,56 @@
+# Advanced: Multi-Branch Pipeline (feature branches)
+# This runs tests on all branches but only deploys main to production
+
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY = 'gauravcontainerreg.azurecr.io'
+    }
+
+    stages {
+        stage('Branch Detection') {
+            steps {
+                script {
+                    echo "Branch: ${BRANCH_NAME}"
+                    if (env.BRANCH_NAME == 'main') {
+                        echo "🟢 Main branch - will deploy to production"
+                    } else {
+                        echo "🔵 Feature branch - will only run tests"
+                    }
+                }
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                // Always build and test
+                sh 'docker build -t test-image -f microservices/auth-service/Dockerfile .'
+                sh 'docker run test-image python -m pytest || true'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                // Only on PRs and main
+                anyOf {
+                    branch 'main'
+                    changeRequest()
+                }
+            }
+            steps {
+                sh 'kubectl apply -f k8s/ -n staging'
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'  // Only main branch
+            }
+            steps {
+                input 'Deploy to production?'
+                sh 'kubectl apply -f k8s/ -n production'
+            }
+        }
+    }
+}

@@ -1,0 +1,83 @@
+services:
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: microservices/auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: microservices/user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=development
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Product Service
+  product-service:
+    build:
+      context: .
+      dockerfile: microservices/product-service/Dockerfile
+    container_name: product-service
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_ENV=development
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    networks:
+      - microservices-network
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+    restart: unless-stopped
+
+networks:
+  microservices-network:
+    driver: bridge

@@ -1,0 +1,147 @@
+# Docker Compose for Deployment (uses GitHub Container Registry images)
+# This is used by GitHub Actions to deploy on your server
+# 
+# For local development, use the main docker-compose.yml
+# This file should be on your deployment server at /app/microservices-project/
+
+version: '3.8'
+
+services:
+  # Auth Service - handles JWT authentication
+  auth-service:
+    image: ghcr.io/$YOUR_GITHUB_USERNAME/microservices-project/auth-service:latest
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=your-secret-key-change-in-production
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # User Service - manages user profiles
+  user-service:
+    image: ghcr.io/$YOUR_GITHUB_USERNAME/microservices-project/user-service:latest
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=production
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Product Service - manages product catalog
+  product-service:
+    image: ghcr.io/$YOUR_GITHUB_USERNAME/microservices-project/product-service:latest
+    container_name: product-service
+    restart: unless-stopped
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_ENV=production
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend
+  frontend:
+    image: ghcr.io/$YOUR_GITHUB_USERNAME/microservices-project/frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (optional but recommended)
+  # Provides better performance and SSL support
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # Mount SSL certificates
+    networks:
+      - microservices-network
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+      - frontend
+
+networks:
+  microservices-network:
+    driver: bridge
+
+# Volumes for persistent data (if needed in future)
+volumes:
+  auth-data:
+  user-data:
+  product-data:
+
+# ============================================================
+# SETUP INSTRUCTIONS FOR YOUR SERVER:
+# ============================================================
+#
+# 1. SSH into your server:
+#    ssh ubuntu@your-server-ip
+#
+# 2. Create app directory:
+#    mkdir -p /app/microservices-project
+#    cd /app/microservices-project
+#
+# 3. Clone your repository:
+#    git clone https://github.com/yourusername/microservices-project.git .
+#
+# 4. Create .env file:
+#    cp docker-compose.prod.yml docker-compose.yml
+#
+# 5. Replace GitHub username:
+#    sed -i 's/$YOUR_GITHUB_USERNAME/yourusername/g' docker-compose.yml
+#
+# 6. Login to GitHub Container Registry:
+#    docker login ghcr.io
+#    # Use your GitHub username and personal access token
+#
+# 7. Start services:
+#    docker compose up -d
+#
+# 8. Check status:
+#    docker compose ps
+#
+# 9. View logs:
+#    docker compose logs -f
+#
+# GitHub Actions will automatically run these commands
+# when you push to the main branch!
+#
+# ============================================================
